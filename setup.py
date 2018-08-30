@@ -14,5 +14,5 @@ setup(
     description='Image Splice Detection via Learned Self-Consistency',
     long_description=readme,
     install_requires=reqs,
-    url='https://github.com/AXATechLab/selfconsistency/blob/master/requirements.txt'
+    url='https://github.com/AXATechLab/selfconsistency/'
 )
