@@ -2,9 +2,9 @@ from __future__ import print_function
 from __future__ import division
 
 import os, sys, numpy as np, ast
-import init_paths
-import load_models
-from lib.utils import benchmark_utils, util
+#import selfconsistency.init_paths
+import selfconsistency.load_models
+from selfconsistency.lib.utils import benchmark_utils, util
 import tensorflow as tf
 import cv2, time, scipy, scipy.misc as scm, sklearn.cluster, skimage.io as skio, numpy as np, argparse
 import matplotlib.pyplot as plt

@@ -1,6 +1,6 @@
 import sys, os
-import init_paths
-from lib.utils import queue_runner, util
+#import init_paths
+from selfconsistency.lib.utils import queue_runner, util
 import tensorflow as tf
 import threading
 import numpy as np

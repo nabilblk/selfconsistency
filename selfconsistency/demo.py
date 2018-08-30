@@ -2,7 +2,7 @@ from __future__ import print_function
 from __future__ import division
 
 import os, sys, numpy as np, ast
-import selfconsistency.init_paths
+#import selfconsistency.init_paths
 import selfconsistency.load_models
 from selfconsistency.lib.utils import benchmark_utils, util
 import tensorflow as tf

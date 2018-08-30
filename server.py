@@ -6,7 +6,7 @@ import uuid
 import re
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
-import demo
+import selfconsistency.demo
 import numpy as np
 import cv2
 import time
