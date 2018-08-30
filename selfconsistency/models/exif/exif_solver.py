@@ -2,7 +2,7 @@ import os, sys, numpy as np, time
 #import selfconsistency.init_paths
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-from utils import ops, io
+from selfconsistency.lib.utils import ops, io
 import traceback
 from collections import deque
 
