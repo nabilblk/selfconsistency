@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 with open('requirements.txt', 'r') as f:
     reqs = f.readlines()
 with open('README.md', 'r') as f:
-    readme = f.read
+    readme = f.read()
 setup(
     name='selfconsistency',
     version='1.0',
