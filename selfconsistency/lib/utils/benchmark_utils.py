@@ -7,6 +7,7 @@ import numpy as np
 import time
 import scipy.misc
 import cv2
+from  concurrent.futures import ThreadPoolExecutor
 
 
 class EfficientBenchmark():
@@ -14,7 +15,7 @@ class EfficientBenchmark():
     def __init__(self, solver, net_module_obj, net_module_obj_init_params, im,
                  num_processes=1, num_threads=1, stride=None, max_bs=20000, n_anchors=3,
                  patch_size=224, auto_close_sess=True, patches=None, mirror_pred=False,
-                 dense_compute=False, num_per_dim=30):
+                 dense_compute=False, num_per_dim=30,nb_threads = 10):
         """
         solver: The model solver to run predictions
         net_module_obj: The corresponding net class
@@ -35,7 +36,7 @@ class EfficientBenchmark():
         """
         assert num_processes == 1, "Can only do single process"
         assert num_threads > 0, "Need at least one threads for queuing"
-        
+        self.pool = ThreadPoolExecutor(max_workers=nb_threads)
         self.use_patches = False
         if type(patches) != type(None):
             # use defined patches
@@ -79,6 +80,7 @@ class EfficientBenchmark():
     
     def update_queue_runner(self, im):
         # returns a new queue_runner
+        # TODO : CHECK IF THIS LINE IS NEEDED
         self.set_image(np.zeros((self.patch_size, self.patch_size, 3), dtype=np.float32))
         
         fn = self.dense_argless if self.dense_compute else self.argless 
@@ -135,6 +137,7 @@ class EfficientBenchmark():
         self.anchor_count = 0
         if self.dense_compute:
             self.anchor_inds = self.indices.copy()
+            # Fetch all patches and normalize them to [-1.0,1.0]
             return util.process_im(np.array([self.get_patch(
                 self.anchor_inds[i][0], self.anchor_inds[i][1]) for i in range(self.anchor_count,
                                                                      min(self.anchor_count + self.n_anchors,
@@ -143,14 +146,17 @@ class EfficientBenchmark():
         if self.use_patches:
             # pass existing patches
             return util.process_im(self.patches)
+        # Sample n_anchor patches randomly
         return util.process_im(
             np.array([self.rand_patch() for i in range(self.n_anchors)], dtype=np.float32))
     
     def set_image(self, image):
         # new image, need to refresh
         self.image = image
+        # Get bounding indexes of patches for both dimensions
         self.max_h_ind = 1 + int(np.floor((self.image.shape[0] - self.patch_size) / float(self.stride)))
         self.max_w_ind = 1 + int(np.floor((self.image.shape[1] - self.patch_size) / float(self.stride)))
+        # Generate indexes of all possible patches
         self.indices = np.mgrid[0:self.max_h_ind, 0:self.max_w_ind].reshape((2, -1)).T # (n 2)
         self.anchor_patches = self.get_anchor_patches()
         self.count = -1
@@ -178,6 +184,7 @@ class EfficientBenchmark():
         return anchor_inds, h_inds, w_inds, batch_a, batch_b
     
     def dense_argless(self):
+        # Patches iterator
         assert False, "Deprecated"
         if self.count >= self.indices.shape[0]:
             self.count = 0
@@ -222,19 +229,23 @@ class EfficientBenchmark():
         
         expected_num_running = self.max_h_ind * self.max_w_ind
         visited = np.zeros((self.max_h_ind, self.max_w_ind))
+        sum_visited = 0
         while True:
             try:
-                # t0 = time.time()
                 h_ind_, w_ind_, fts_ = self.solver.sess.run([self.h_indices_,
                                                              self.w_indices_,
                                                              self.solver.net.im_b_feat])
-                # print time.time() - t0
+                responses[:, h_ind_, w_ind_[0:h_ind_.shape[0]]] = fts_[0:h_ind_.shape[0]].T
+                
                 for i in range(h_ind_.shape[0]):
-                    responses[:, h_ind_[i], w_ind_[i]] = fts_[i]
-                    visited[h_ind_[i], w_ind_[i]] = 1
-                if np.sum(visited) == expected_num_running:
-                    raise RuntimeError("Finished")
-                    
+                    if visited[h_ind_[i], w_ind_[i]] == 0:
+                        visited[h_ind_[i], w_ind_[i]] = 1
+                        sum_visited +=1
+                if sum_visited == expected_num_running:
+                    if self.auto_close_sess:
+                        self.solver.sess.close()
+                    return responses
+
             except tf.errors.OutOfRangeError as e:
                 # TF Queue emptied, return responses
                 if self.auto_close_sess:
@@ -260,29 +271,32 @@ class EfficientBenchmark():
                               self.max_h_ind + spread - 1, self.max_w_ind + spread - 1), dtype=np.float32)
         vote_counts = np.zeros((self.max_h_ind + spread - 1, self.max_w_ind + spread - 1,
                                 self.max_h_ind + spread - 1, self.max_w_ind + spread - 1)) + 1e-4
-        
+        t0 = time.time()
+
         iterator = self.argless_extract_inds()
-        while True:
-            try:
-                inds = next(iterator)
-            except StopIteration as e:
-                if self.auto_close_sess:
-                    self.solver.sess.close()
-                out = (responses / vote_counts)
-                return out
+        futures = []
+        inds_cpy =  []
+        for inds in  iterator:
             patch_a_inds = inds[:, :2]
             patch_b_inds = inds[:, 2:]
 
             a_ind = np.ravel_multi_index(patch_a_inds.T, [self.max_h_ind, self.max_w_ind])
             b_ind = np.ravel_multi_index(patch_b_inds.T, [self.max_h_ind, self.max_w_ind])
-
-            # t0 = time.time()
-            preds_ = self.solver.sess.run(self.solver.net.pc_cls_pred,
-                                          feed_dict={self.net.precomputed_features:flattened_features,
+            futures.append(self.pool.submit(self.solver.sess.run,self.solver.net.pc_cls_pred,
+                 feed_dict={self.net.precomputed_features:flattened_features,
                                                      self.net.im_a_index: a_ind,
-                                                     self.net.im_b_index: b_ind})
+                                                     self.net.im_b_index: b_ind}))
+            # t0 = time.time()
+            # preds_ = self.solver.sess.run(self.solver.net.pc_cls_pred,
+            #                               feed_dict={self.net.precomputed_features:flattened_features,
+            #                                          self.net.im_a_index: a_ind,
+            #                                          self.net.im_b_index: b_ind})
             # print preds_
             # print time.time() - t0
+            inds_cpy.append(inds)
+        for idx,future in enumerate(futures):
+            preds_ = future.result()
+            inds = inds_cpy[idx]
             for i in range(preds_.shape[0]):
                 responses[inds[i][0] : (inds[i][0] + spread),
                           inds[i][1] : (inds[i][1] + spread),
@@ -292,5 +306,9 @@ class EfficientBenchmark():
                           inds[i][1] : (inds[i][1] + spread),
                           inds[i][2] : (inds[i][2] + spread),
                           inds[i][3] : (inds[i][3] + spread)] += 1
+        if self.auto_close_sess:
+            self.solver.sess.close()
+        out = (responses / vote_counts)
+        return out
                 
 

@@ -3,7 +3,7 @@ import numpy as np
 import time
 import multiprocessing as mp
 import threading
-import Queue
+import queue
             
 class CustomRunner(object):
     """
@@ -88,7 +88,7 @@ class CustomRunner(object):
                 break
             try:
                 data = self.queue.get(5)
-            except Queue.Empty:
+            except queue.Empty:
                 continue
                 
             if type(data) == type(StopIteration()):

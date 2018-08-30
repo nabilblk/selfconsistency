@@ -127,8 +127,14 @@ class EXIFNet():
             all_total_loss = []
 
             for i, gpu_id in enumerate(self.use_gpu):
-                print('Initializing graph on gpu %i' % gpu_id)
-                with tf.device('/gpu:%d' % gpu_id):
+
+                if gpu_id == -1:
+                    device = '/cpu:0'
+                else:
+                    device = '/gpu:%d' % gpu_id
+
+                print('Initializing graph on device {}'.format(device))
+                with tf.device(device):
                     if preemptive_reuse:
                         tf.get_variable_scope().reuse_variables()
                         

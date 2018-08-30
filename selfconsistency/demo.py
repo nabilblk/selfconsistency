@@ -9,7 +9,7 @@ import tensorflow as tf
 import cv2, time, scipy, scipy.misc as scm, sklearn.cluster, skimage.io as skio, numpy as np, argparse
 import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
-
+import time
 def mean_shift(points_, heat_map, iters=5):
     points = np.copy(points_)
     kdt = scipy.spatial.cKDTree(points)
@@ -289,7 +289,8 @@ def run_vote_no_threads(image, solver, exif_to_use, n_anchors=1, num_per_dim=Non
 
 class Demo():
     def __init__(self, ckpt_path='/data/scratch/minyoungg/ckpt/exif_medifor/exif_medifor.ckpt', use_gpu=0,
-                 quality=3.0, patch_size=128, num_per_dim=30):
+                 quality=3.0, patch_size=128, num_per_dim=30,nb_threads= 10):
+        print('LOADED')
         self.quality = quality # sample ratio
         self.solver, nc, params = load_models.initialize_exif(ckpt=ckpt_path, init=False, use_gpu=use_gpu)
         params["im_size"] = patch_size
@@ -298,23 +299,29 @@ class Demo():
         im = np.zeros((256, 256, 3))
         self.bu = benchmark_utils.EfficientBenchmark(self.solver, nc, params, im, auto_close_sess=False, 
                                                      mirror_pred=False, dense_compute=False, stride=None, n_anchors=10,
-                                                     patch_size=patch_size, num_per_dim=num_per_dim)
+                                                     patch_size=patch_size, num_per_dim=num_per_dim,nb_threads= nb_threads)
         return
 
     def run(self, im, gt=None, show=False, save=False,
             blue_high=False, use_ncuts=False):
         # run for every new image
         self.bu.reset_image(im)
+        print('START')
+        start = time.time()
         res = self.bu.precomputed_analysis_vote_cls(num_fts=4096)
+        print('precomputed_analysis_vote_cls took {} s'.format(time.time()-start))
         #print('result shape', np.shape(res))
-        ms = mean_shift(res.reshape((-1, res.shape[0] * res.shape[1])), res)
+        if not use_ncuts:
+            start = time.time()
+            ms = mean_shift(res.reshape((-1, res.shape[0] * res.shape[1])), res)
+            print('Mean shift took {} s'.format(time.time()-start))
         
-        if np.mean(ms > .5) > .5:
-            # majority of the image is above .5
-            if blue_high:
-                ms = 1 - ms
+            if np.mean(ms > .5) > .5:
+                # majority of the image is above .5
+                if blue_high:
+                    ms = 1 - ms
         
-        if use_ncuts:
+        else:
 
             ncuts = normalized_cut(res)
             if np.mean(ncuts > .5) > .5:
@@ -323,12 +330,13 @@ class Demo():
                 ncuts = 1 - ncuts
             out_ncuts = cv2.resize(ncuts.astype(np.float32), (im.shape[1], im.shape[0]),
                                    interpolation=cv2.INTER_LINEAR)
-
-        out_ms = cv2.resize(ms, (im.shape[1], im.shape[0]), interpolation=cv2.INTER_LINEAR)
+        if not use_ncuts:
+            out_ms = cv2.resize(ms, (im.shape[1], im.shape[0]), interpolation=cv2.INTER_LINEAR)
             
             
-        if use_ncuts:
-            return out_ms, out_ncuts
+        else:
+            print('ONLY N_CUT')
+            return out_ncuts, out_ncuts
         return out_ms
     
     def run_vote(self, im, num_per_dim=3, patch_size=128):

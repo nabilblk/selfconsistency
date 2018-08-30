@@ -13,16 +13,17 @@ def get_variables(finetune_ckpt_path, exclude_scopes=None):
 
 def config(use_gpu=None):
     config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
+    if (type(use_gpu) is list) and (-1 not in use_gpu) :
+        config.gpu_options.allow_growth = True
     config.allow_soft_placement = True
-    if use_gpu:
+    if (type(use_gpu) is list) and (-1 not in use_gpu) :
         if type(use_gpu) is list:
             use_gpu = ','.join([str(g) for g in use_gpu])
         config.gpu_options.visible_device_list = str(use_gpu)
     return config
 
 def tfprint(x):
-    print x
+    print(x)
     return x
 
 def extract_var(starts_with, is_not=False):

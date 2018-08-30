@@ -29,11 +29,11 @@ def to_npy(path):
 
 def show(args, phase, iter):
     """ Used to show training outputs """
-    print '(%s) Iterations %i' % (phase, iter)
+    print('(%s) Iterations %i' % (phase, iter))
     max_len = max([len(k[0]) for k in args])
     for out in args:
         a,b = out
-        print '\t',a.ljust(max_len),': ', b
+        print('\t',a.ljust(max_len),': ', b)
     return
 
 def add_summary(writer, list_of_summary, i):
@@ -47,7 +47,7 @@ def parse_checkpoint(ckpt):
     try:
         i = int(ckpt.split('_')[-1].split('.')[0])
     except:
-        print 'unknown checkpoint string format %s setting iteration to 0' % ckpt
+        print('unknown checkpoint string format %s setting iteration to 0' % ckpt)
         i = 0
     return i
 
@@ -57,5 +57,5 @@ def make_ckpt(saver, sess, save_prefix, i=None):
         save_prefix += '_' + str(i)
     save_path = save_prefix + '.ckpt'
     saver.save(sess, save_path)
-    print 'Saved checkpoint at %s' % save_path
+    print('Saved checkpoint at %s' % save_path)
     return

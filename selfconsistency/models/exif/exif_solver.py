@@ -51,30 +51,30 @@ class ExifSolver(object):
             try:
                 self.saver.restore(self.sess, self.checkpoint)
                 self.i = io.parse_checkpoint(self.checkpoint)
-                print 'Succesfully resuming from %s' % self.checkpoint
+                print('Succesfully resuming from %s' % self.checkpoint)
             except Exception:
-                print traceback.format_exc()
+                print(traceback.format_exc())
                 try:
-                    print 'Model and checkpoint did not match, attempting to restore only weights'
+                    print('Model and checkpoint did not match, attempting to restore only weights')
                     variables_to_restore = ops.get_variables(self.checkpoint, exclude_scopes=['Adam'])
                     restorer = tf.train.Saver(variables_to_restore)
                     restorer.restore(self.sess, self.checkpoint)
                 except Exception:
-                    print 'Model and checkpoint did not match, attempting to partially restore'
+                    print('Model and checkpoint did not match, attempting to partially restore')
                     self.sess.run(tf.global_variables_initializer())
                     # Make sure you correctly set exclude_scopes if you are finetuining models or extending it
                     variables_to_restore = ops.get_variables(self.checkpoint, exclude_scopes=['classify']) #'resnet_v2_50/logits/', 'predict',
                     restorer = tf.train.Saver(variables_to_restore)
                     restorer.restore(self.sess, self.checkpoint)
 
-                print 'Variables intitializing from scratch'
+                print('Variables intitializing from scratch')
                 for var in tf.trainable_variables():
                     if var not in variables_to_restore:
-                        print var
-                print 'Succesfully restored %i variables' % len(variables_to_restore)
+                        print(var)
+                print('Succesfully restored %i variables' % len(variables_to_restore))
                 self.i = 0
         else:
-            print 'Initializing from scratch'
+            print('Initializing from scratch')
             self.i = 0
             self.sess.run(tf.global_variables_initializer())
         self.start_i = self.i
@@ -138,7 +138,7 @@ class ExifSolver(object):
         return args
 
     def train(self):
-        print 'Started training'
+        print('Started training')
         while self.i < self.train_iterations:
             if self.test_init and self.i == self.start_i:
                 print('Testing initialization')
