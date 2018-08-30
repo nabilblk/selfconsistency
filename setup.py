@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 with open('requirements.txt', 'r') as f:
-    reqs = f.readlines()
+    reqs = list(filter(lambda x : x.startswith('#'),f.readlines()))
 with open('README.md', 'r') as f:
     readme = f.read()
 setup(

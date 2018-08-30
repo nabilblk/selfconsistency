@@ -1,6 +1,6 @@
 numpy
 opencv_python
-tensorflow_gpu>=1.2.0
+#tensorflow_gpu>=1.2.0
 scikit-image
 scipy
 matplotlib
