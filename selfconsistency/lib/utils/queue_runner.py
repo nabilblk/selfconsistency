@@ -20,7 +20,7 @@ class CustomRunner(object):
         
     """
     def __init__(self, arg_less_fn, override_dtypes=None,
-                 n_threads=1, n_processes=3, max_size=30):
+                 n_threads=1, n_processes=3, max_size=30,batch_size = 5,patch_size=128):
         # arg_less_fn should be function that returns already ready data
         # in the form of numpy arrays. The shape of the output is
         # used to shape the output tensors. Should be ready to call at init_time
@@ -30,14 +30,12 @@ class CustomRunner(object):
         self.n_processes = n_processes
         self.max_size = max_size
         self.use_pool = False
-        
-        # data_fn shouldn't take any argument,
-        # just directly return the necessary data
-        # set via the setter fn
-        
         data = self.data_fn()
+        self.nb_elements_per_example = len(data)
         self.inps = []
         shapes, dtypes = [], []
+        # d.shape[1:] is the patch size
+        # TODO: Useless loop
         for i, d in enumerate(data):
             inp = tf.placeholder(dtype=d.dtype, shape=[None] + list(d.shape[1:]))
             self.inps.append(inp)
@@ -67,77 +65,34 @@ class CustomRunner(object):
         """
         Function run on alternate thread. Basically, keep adding data to the queue.
         """
-        tt_last_update = time.time() - 501
-        count = 0
-        tot_p_end = 0
-        processes_all_done = False
-        while not stop_event.isSet():
-            if tt_last_update + 500 < time.time():
-                t = time.time()
-                # 500 seconds since last update
-                #print("DataQueue Threading Update:")
-                #print("TIME: " + str(t))
-                # MP.Queue says it is not thread safe and is not perfectly accurate.
-                # Just want to make sure there's no leakage and max_size 
-                # is safely hit
-                #print("APPROX SIZE: %d" % self.queue.qsize())
-                #print("TOTAL FETCH ITERATIONS: %d" % count)
-                tt_last_update = t
-            count += 1
-            if processes_all_done and self.queue.empty():
-                break
+        #TODO : RECHECK
+        # np.random.seed(1)
+        while (not stop_event.isSet()):
             try:
-                data = self.queue.get(5)
-            except queue.Empty:
-                continue
-                
-            if type(data) == type(StopIteration()):
-                tot_p_end += 1
-                if tot_p_end == self.n_processes:
-                    # Kill any processes
-                    # may need a lock here if multithreading
-                    processes_all_done = True
-                    #print("ALL PROCESSES DONE")
-                continue
-            
+                data = self.data_fn()
+            except StopIteration as e:
+                stop = True
+                break
             fd = {}
             for i, d in enumerate(data):
                 fd[self.inps[i]] = d
             sess.run(self.enqueue_op, feed_dict=fd)
-        self.queue.close()
 
-    def process_main(self, queue):
-        # Scramble seed so it's not a copy of the parent's seed
-        np.random.seed()
-        # np.random.seed(1)
-        try:
-            while True:
-                queue.put(self.data_fn())
-        except StopIteration as e:
-            # Should only manually throw when want to close queue
-            queue.put(e)
-            #raise e
-            return
-        
-        except Exception as e:
-            queue.put(StopIteration())
-            #raise e
-            return
-        
+
         
     def set_data_fn(self, fn):
         self.data_fn = fn
         
     def start_p_threads(self, sess):
         """ Start background threads to feed queue """
-        self.processes = []
-        self.queue = mp.Queue(self.max_size)
+        # self.processes = []
+        # self.queue = mp.Queue(self.max_size)
         
-        for n in range(self.n_processes):
-            p = mp.Process(target=self.process_main, args=(self.queue,))
-            p.daemon = True # thread will close when parent quits
-            p.start()
-            self.processes.append(p)
+        # for n in range(self.n_processes):
+        #     p = mp.Process(target=self.process_main, args=(self.queue,))
+        #     p.daemon = True # thread will close when parent quits
+        #     p.start()
+        #     self.processes.append(p)
             
         self.threads = []
         self.thread_event_killer = []
@@ -149,7 +104,7 @@ class CustomRunner(object):
             t.daemon = True # thread will close when parent quits
             t.start()
             self.threads.append(t)
-        return self.processes + self.threads
+        return self.threads
     
     def kill_programs(self):
         # Release objects here if need to
@@ -157,8 +112,8 @@ class CustomRunner(object):
         # nothing blocks for more than 5 seconds
         
         # Sig term, kill first so no more data
-        [p.terminate() for p in self.processes]
-        [p.join() for p in self.processes]
+        # [p.terminate() for p in self.processes]
+        # [p.join() for p in self.processes]
         
         # kill second after purging
         [e.set() for e in self.thread_event_killer]

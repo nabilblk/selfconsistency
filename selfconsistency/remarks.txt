@@ -1,0 +1,6 @@
+- samples 10 patches to work with everytime
+- kill all current patches before starting a new prediction 
+- all patches are sampled randomly
+- look at all process_img and see if we can remove some
+- compare every image patche against a chosen number of patches
+-queue_runner start process to copy patches in queue, and threads to copy queue patches into tf queue

@@ -2,15 +2,16 @@ from __future__ import print_function
 from __future__ import division
 
 import os, sys, numpy as np, ast
-#import selfconsistency.init_paths
-import selfconsistency.load_models as load_models
-from selfconsistency.lib.utils import benchmark_utils, util
+import init_paths
+import load_models
+from lib.utils import benchmark_utils, util
 import tensorflow as tf
 import cv2, time, scipy, scipy.misc as scm, sklearn.cluster, skimage.io as skio, numpy as np, argparse
 import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
 import time
 def mean_shift(points_, heat_map, iters=5):
+    print('Shape mean shift in : {}'.format(points_.shape))
     points = np.copy(points_)
     kdt = scipy.spatial.cKDTree(points)
     eps_5 = np.percentile(scipy.spatial.distance.cdist(points, points, metric='euclidean'), 10)
@@ -23,8 +24,8 @@ def mean_shift(points_, heat_map, iters=5):
     val = []
     for i in range(points.shape[0]):
         val.append(kdt.count_neighbors(scipy.spatial.cKDTree(np.array([points[i]])), r=eps_5))
-    mode_ind = np.argmax(val)
-    ind = np.nonzero(val == np.max(val))
+    max_val =  np.max(val)
+    ind = np.nonzero(val == max_val)
     return np.mean(points[ind[0]], axis=0).reshape(heat_map.shape[0], heat_map.shape[1])
 
 def centroid_mode(heat_map):
@@ -186,7 +187,10 @@ def run_vote_no_threads(image, solver, exif_to_use, n_anchors=1, num_per_dim=Non
     sample_ratio: The ratio of overlap between patches. num_per_dim must be None
                   to be useful.
     """
+    
 
+    # DEPRECATED: DONT USE IT
+    
     h, w = np.shape(image)[:2]
 
     if patch_size is None:
@@ -289,7 +293,7 @@ def run_vote_no_threads(image, solver, exif_to_use, n_anchors=1, num_per_dim=Non
 
 class Demo():
     def __init__(self, ckpt_path='/data/scratch/minyoungg/ckpt/exif_medifor/exif_medifor.ckpt', use_gpu=0,
-                 quality=3.0, patch_size=128, num_per_dim=30,nb_threads= 10):
+                 quality=3.0, patch_size=128, num_per_dim=30,nb_threads= 10,num_threads=1,n_anchors = 10):
         print('LOADED')
         self.quality = quality # sample ratio
         self.solver, nc, params = load_models.initialize_exif(ckpt=ckpt_path, init=False, use_gpu=use_gpu)
@@ -298,17 +302,17 @@ class Demo():
         tf.reset_default_graph()
         im = np.zeros((256, 256, 3))
         self.bu = benchmark_utils.EfficientBenchmark(self.solver, nc, params, im, auto_close_sess=False, 
-                                                     mirror_pred=False, dense_compute=False, stride=None, n_anchors=10,
+                                                     mirror_pred=False,num_threads=num_threads,dense_compute=False, stride=None, n_anchors=n_anchors,
                                                      patch_size=patch_size, num_per_dim=num_per_dim,nb_threads= nb_threads)
         return
 
     def run(self, im, gt=None, show=False, save=False,
-            blue_high=False, use_ncuts=False):
+            blue_high=False, use_ncuts=False,dense = True):
         # run for every new image
         self.bu.reset_image(im)
         print('START')
         start = time.time()
-        res = self.bu.precomputed_analysis_vote_cls(num_fts=4096)
+        res = self.bu.precomputed_analysis_vote_cls(num_fts=4096,dense = dense)
         print('precomputed_analysis_vote_cls took {} s'.format(time.time()-start))
         #print('result shape', np.shape(res))
         if not use_ncuts:
@@ -344,6 +348,7 @@ class Demo():
         all_results = []
         for hSt in np.linspace(0, h - patch_size, num_per_dim).astype(int):
             for wSt in np.linspace(0, w - patch_size, num_per_dim).astype(int):
+                print('START')
                 res = run_vote_no_threads(im, self.solver, None, n_anchors=1, num_per_dim=None,
                                           patch_size=128, batch_size=64, sample_ratio=self.quality, 
                                           override_anchor=(hSt, wSt))['out']['responses'][0]
@@ -371,12 +376,14 @@ class Demo():
         #print('Image shape:', np.shape(im))
         assert min(np.shape(im)[:2]) > self.im_size, 'image dimension too small'
         
-        if not dense:
-            # Runs default dense clustering
-            out, _ = self.run_vote(im, num_per_dim=3, patch_size=self.im_size)
-        else:
-            # Runs DBSCAN
-            out = self.run(im)
+        # if not dense:
+        #     # Runs DBSCAN
+        #     raise NotImplementedError
+        #     # out, _ = self.run_vote(im, num_per_dim=3, patch_size=self.im_size)
+
+        # else:
+        #     # Runs default dense clustering
+        out = self.run(im,dense=dense)
         return im, out
     
 if __name__ == '__main__':
