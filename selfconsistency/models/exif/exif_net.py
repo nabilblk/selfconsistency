@@ -1,7 +1,7 @@
 import tensorflow as tf
-from utils import ops
+from selfconsistency.lib.utils import ops
 import copy, numpy as np
-from nets import resnet_v2, resnet_utils
+from selfconsistency.nets import resnet_v2, resnet_utils
 slim = tf.contrib.slim
 resnet_arg_scope = resnet_utils.resnet_arg_scope
 
