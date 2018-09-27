@@ -163,6 +163,7 @@ class EXIFNet():
                     
 
 
+        if self.train_classifcation:
             self.pc_cls_pred = tf.sigmoid(pc_cls_out)
         return
 
