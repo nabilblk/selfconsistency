@@ -84,25 +84,6 @@ class ExifSolver(object):
             tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
         return
 
-    # def setup_summary(self):
-    #     """ Setup summary """
-    #     max_num_out = 2
-    #     self.summary = [
-    #         tf.summary.image('input_a', self.net.im_a, max_outputs=max_num_out),
-    #         tf.summary.image('input_b', self.net.im_b, max_outputs=max_num_out),
-    #         tf.summary.scalar('total_loss', self.net.total_loss),
-    #         tf.summary.scalar('learning_rate', self.net._opt._lr)
-    #     ]
-    #     if not self.net.freeze_base:
-    #         self.summary.extend([tf.summary.scalar('exif_loss', self.net.loss),
-    #                              tf.summary.scalar('exif_accuracy', self.net.accuracy)])
-    #     if self.net.train_classifcation:
-    #         self.summary.extend([tf.summary.scalar('cls_loss', self.net.cls_loss),
-    #                              tf.summary.scalar('cls_accuracy', self.net.cls_accuracy)])
-    #     if self.use_exif_summary:
-    #         self.tag_holder = {tag:tf.placeholder(tf.float32) for tag in self.net.train_runner.tags}
-    #         self.individual_summary = {tag:tf.summary.scalar('individual/' + tag, self.tag_holder[tag]) for tag in self.net.train_runner.tags}
-    #     return
 
     def setup_data(self, data, data_fn=None):
         assert not self.net.use_tf_threading, "Using queue runner"
@@ -178,26 +159,6 @@ class ExifSolver(object):
         io.show([['Train time', np.mean(list(self.train_timer))]],
                  phase=phase, iter=self.i)
         return
-
-    # def test(self, writer):
-    #     if self.use_exif_summary:
-    #         exif_start = time.time()
-    #         test_queue = self.net.train_runner.get_random_test(batch_size=self.net.batch_size)
-    #         to_print = []
-    #         for i, (im_a_batch, im_b_batch, label_batch) in enumerate(test_queue):
-    #             tag = self.net.train_runner.tags[i]
-    #             output = self.sess.run(self.net.pred, feed_dict={self.net.im_a:im_a_batch,
-    #                                                              self.net.im_b:im_b_batch,
-    #                                                              self.net.label:label_batch,
-    #                                                              self.net.is_training:False})
-
-    #             tag_acc = 100.0 * (np.sum(np.round(output[:, i]) == label_batch[:, i])/float(self.net.batch_size))
-    #             summary = self.sess.run(self.individual_summary[tag], feed_dict={self.tag_holder[tag]:tag_acc})
-    #             io.add_summary(writer, [summary], self.i)
-    #             to_print.append([tag, tag_acc])
-    #         io.show(to_print, phase='test', iter=self.i)
-    #         print('EXIF test accuracy evaluation took %.2f seconds' % (time.time() - exif_start))
-    #     return
 
 def initialize(args):
     return ExifSolver(**args)

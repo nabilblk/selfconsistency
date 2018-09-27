@@ -173,122 +173,6 @@ def dbscan_consensus(results, eps_range=(0.1, 0.5), eps_sample=10, dbscan_sample
         plt.imshow(best_pred, cmap='jet', vmin=0.0, vmax=1.0)  
     return best_pred, lowest_spread
 
-def run_vote_no_threads(image, solver, exif_to_use, n_anchors=1, num_per_dim=None,
-             patch_size=None, batch_size=None, sample_ratio=3.0, override_anchor=False):
-    """
-    solver: exif_solver module. Must be initialized and have a network connected.
-    exif_to_use: exif to extract responses from. A list. If exif_to_use is None
-                 extract result from classification output cls_pred
-    n_anchors: number of anchors to use.
-    num_per_dim: number of patches to use along the largest dimension.
-    patch_size: size of the patch. If None, uses the one specified in solver.net
-    batch_size: size of the batch. If None, uses the one specified in solver.net
-    sample_ratio: The ratio of overlap between patches. num_per_dim must be None
-                  to be useful.
-    """
-    
-
-    # DEPRECATED: DONT USE IT
-    
-    h, w = np.shape(image)[:2]
-
-    if patch_size is None:
-        patch_size = solver.net.im_size
-
-    if batch_size is None:
-        batch_size = solver.net.batch_size
-
-    if num_per_dim is None:
-        num_per_dim = int(np.ceil(sample_ratio * (max(h,w)/float(patch_size))))
-
-    if exif_to_use is None:
-        not_exif = True
-        exif_to_use = ['out']
-    else:
-        not_exif = False
-        exif_map = {e: np.squeeze(np.argwhere(np.array(solver.net.train_runner.tags) == e)) for e in exif_to_use}
-
-    responses   = {e:np.zeros((n_anchors, h, w)) for e in exif_to_use}
-    vote_counts = {e:1e-6 * np.ones((n_anchors, h, w)) for e in exif_to_use}
-
-    if np.min(image) < 0.0:
-        # already preprocessed
-        processed_image = image
-    else:
-        processed_image = util.process_im(image)
-    ones = np.ones((patch_size, patch_size))
-
-    anchor_indices = []
-    # select n anchors
-    for anchor_idx in range(n_anchors):
-        if override_anchor is False:
-            _h, _w  = np.random.randint(0, h - patch_size), np.random.randint(0, w - patch_size)
-        else:
-            assert len(override_anchor) == 2, override_anchor
-            _h, _w = override_anchor
-
-        anchor_indices.append((_h, _w))
-        anchor_patch = processed_image[_h:_h+patch_size, _w:_w+patch_size, :]
-
-        batch_a = np.tile([anchor_patch], [batch_size, 1, 1, 1])
-        batch_b, batch_b_coord = [], []
-
-        prev_batch = None
-        for i in np.linspace(0, h - patch_size, num_per_dim).astype(int):
-            for j in np.linspace(0, w - patch_size, num_per_dim).astype(int):
-                compare_patch = processed_image[i:i+patch_size, j:j+patch_size]
-                batch_b.append(compare_patch)
-                batch_b_coord.append((i,j))
-
-                if len(batch_b) == batch_size:
-                    if not_exif:
-                        pred = solver.sess.run(solver.net.cls_pred,
-                                 feed_dict={solver.net.im_a:batch_a,
-                                            solver.net.im_b:batch_b,
-                                            solver.net.is_training:False})
-                    else:
-                        pred = solver.sess.run(solver.net.pred,
-                                 feed_dict={solver.net.im_a:batch_a,
-                                            solver.net.im_b:batch_b,
-                                            solver.net.is_training:False})
-
-                    for p_vec, (_i, _j) in zip(pred, batch_b_coord):
-                        for e in exif_to_use:
-                            if not_exif:
-                                p = p_vec[0]
-                            else:
-                                p = p_vec[int(exif_map[e])]
-                            responses[e][anchor_idx, _i:_i+patch_size, _j:_j+patch_size] += (p * ones)
-                            vote_counts[e][anchor_idx, _i:_i+patch_size, _j:_j+patch_size] += ones
-                    prev_batch = batch_b
-                    batch_b, batch_b_coord = [], []
-
-        if len(batch_b) > 0:
-            batch_b_len = len(batch_b)
-            to_pad = np.array(prev_batch)[:batch_size - batch_b_len]
-            batch_b = np.concatenate([batch_b, to_pad], axis=0)
-
-            if not_exif:
-                pred = solver.sess.run(solver.net.cls_pred,
-                                     feed_dict={solver.net.im_a:batch_a,
-                                                solver.net.im_b:batch_b,
-                                                solver.net.is_training:False})
-            else:
-                pred = solver.sess.run(solver.net.pred,
-                                     feed_dict={solver.net.im_a:batch_a,
-                                                solver.net.im_b:batch_b,
-                                                solver.net.is_training:False})
-
-            for p_vec, (_i, _j) in zip(pred, batch_b_coord):
-                for e in exif_to_use:
-                    if not_exif:
-                        p = p_vec[0]
-                    else:
-                        p = p_vec[int(exif_map[e])]
-                    responses[e][anchor_idx, _i:_i+patch_size, _j:_j+patch_size] += (p * ones)
-                    vote_counts[e][anchor_idx, _i:_i+patch_size, _j:_j+patch_size] += ones
-
-    return {e: {'responses':(responses[e] / vote_counts[e]), 'anchors':anchor_indices} for e in exif_to_use}
 
 class Demo():
     def __init__(self, ckpt_path='/data/scratch/minyoungg/ckpt/exif_medifor/exif_medifor.ckpt', use_gpu=0,
@@ -313,7 +197,6 @@ class Demo():
         start = time.time()
         res = self.bu.precomputed_analysis_vote_cls(num_fts=4096,dense = dense)
         print('precomputed_analysis_vote_cls took {} s'.format(time.time()-start))
-        #print('result shape', np.shape(res))
         if not use_ncuts:
             start = time.time()
             ms = mean_shift(res.reshape((-1, res.shape[0] * res.shape[1])), res)
@@ -372,16 +255,7 @@ class Demo():
             else:
                 im = cv2.imread(url)[:,:,[2,1,0]]
 
-        #print('Image shape:', np.shape(im))
         assert min(np.shape(im)[:2]) > self.im_size, 'image dimension too small'
-        
-        # if not dense:
-        #     # Runs DBSCAN
-        #     raise NotImplementedError
-        #     # out, _ = self.run_vote(im, num_per_dim=3, patch_size=self.im_size)
-
-        # else:
-        #     # Runs default dense clustering
         out = self.run(im,dense=dense)
         return im, out
     

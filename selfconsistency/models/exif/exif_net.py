@@ -47,16 +47,13 @@ class EXIFNet():
         self.learning_rate = learning_rate
 
         if self.use_tf_threading:
-            print('ICIIII')
             assert self.batch_size is not None, self.batch_size
             assert self.batch_size % len(use_gpu) == 0, 'batch size should be modulo of the number of gpus'
             im_b,label = self.train_runner.get_inputs(self.batch_size)
-            #self.im_a = tf.placeholder_with_default(im_a, [None, self.im_size, self.im_size, 3])
             self.im_b = tf.placeholder_with_default(im_b, [None, self.im_size, self.im_size, 3])
             self.label = tf.placeholder_with_default(label, [None, self.num_classes])
             self.cls_label = tf.placeholder(tf.float32, [None, 1])
         else:
-            #self.im_a  =  tf.placeholder(tf.float32, [None, self.im_size, self.im_size, 3])
             self.im_b  =  tf.placeholder(tf.float32, [None, self.im_size, self.im_size, 3])
             self.label =  tf.placeholder(tf.float32, [None, self.num_classes])
             self.cls_label = tf.placeholder(tf.float32, [None, 1])
@@ -65,7 +62,6 @@ class EXIFNet():
 
         self.extract_features = self.extract_features_resnet50
         # if precomputing, need to populate via feed dict then compute with selecting indices
-        # self.im_a_ind, self.im_b_ind
         self.precomputed_features = tf.placeholder(tf.float32, [None, 4096])
         # Add second precompute_features_b for different patch gridding
         self.im_a_index = tf.placeholder(tf.int32, [None,])
@@ -110,7 +106,6 @@ class EXIFNet():
         """
         with tf.variable_scope(tf.get_variable_scope()):
             # Split data into n equal batches
-            #im_a_list  = tf.split(self.im_a, len(self.use_gpu))
             im_b_list  = tf.split(self.im_b, len(self.use_gpu))
             label_list = tf.split(self.label, len(self.use_gpu))
             if self.train_classifcation:
@@ -144,74 +139,31 @@ class EXIFNet():
                     if self.train_classifcation:
                         cls_label = cls_label_list[i]
 
-                    # with tf.name_scope('extract_feature_a'):
-                    #     im_a_feat = self.extract_features(im_a, name='feature_resnet')
-                    #     self.im_a_feat = im_a_feat
                         
                     with tf.name_scope('extract_feature_b'):
                         im_b_feat = self.extract_features(im_b, name='feature_resnet')
                         self.im_b_feat = im_b_feat
 
                     with tf.name_scope('predict_same'):
-                        # feat_ab = tf.concat([im_a_feat, im_b_feat], axis=-1)
-                        # out = self.predict(feat_ab, name='predict')
-                        # all_out.append(out)
+
                         
                         pc_feat_ab = tf.concat([self.pc_im_a_feat, self.pc_im_b_feat], axis=-1)
                         pc_out = self.predict(pc_feat_ab, name='predict')
 
-                    # if not self.freeze_base:
-                    #     with tf.name_scope('exif_loss'):
-                    #         loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=label, logits=out))
-                    #         all_loss.append(loss)
-                    #         total_loss += loss
                     
                     if self.train_classifcation:
                         with tf.name_scope('predict_same_image'):
                             if self.use_classify_with_feat:
-                                #cls_out = self.classify_with_feat(im_a_feat, im_b_feat, out, name='classify')
                                 pc_cls_out = self.classify_with_feat(pc_im_a_feat, pc_im_b_feat, pc_out, name='classify')
                             else:
-                                # cls_out = self.classify(out, name='classify')
                                 pc_cls_out = self.classify(pc_out, name='classify')
-                            # all_cls_out.append(cls_out)
-                        # with tf.name_scope('classification_loss'):
-                        #     cls_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=cls_label, logits=cls_out))
-                        #     all_cls_loss.append(cls_loss)
-                        #     total_loss += cls_loss
+
 
                     tf.get_variable_scope().reuse_variables()
-                    # grad = self._opt.compute_gradients(total_loss, var_list=self.get_variables())
-                    # all_grads.append(grad)
-                    # all_total_loss.append(total_loss)
+                    
 
-        # # Average the gradient and apply
-        # avg_grads = ops.average_gradients(all_grads)
-        # self.all_loss = all_loss
-        # self.avg_grads = avg_grads
 
-        # if not self.freeze_base:
-        #     self.loss = tf.reduce_mean(all_loss)
-
-        # if self.train_classifcation:
-        #     self.cls_loss = tf.reduce_mean(all_cls_loss)
-
-        # self.total_loss = tf.reduce_mean(all_total_loss)
-        # self.opt  = self._opt.apply_gradients(avg_grads) # trains all variables for now
-
-        # # For logging results
-        # self.out     = tf.concat(all_out, axis=0)
-        # self.pred    = tf.sigmoid(self.out)
-
-        # if not self.freeze_base:
-        #     correct_prediction = tf.equal(tf.round(self.pred), tf.round(self.label))
-        #     self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
-        if self.train_classifcation:
-        #     self.cls_out = tf.concat(all_cls_out, axis=0)
-            # self.cls_pred = tf.sigmoid(self.cls_out)
             self.pc_cls_pred = tf.sigmoid(pc_cls_out)
-        #     self.cls_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(self.cls_pred), tf.round(self.cls_label)), tf.float32))
         return
 
     def extract_features_resnet50(self, im, name, is_training=True, reuse=False):
