@@ -2,7 +2,7 @@ import sys, os
 import tensorflow as tf
 
 def initialize_exif(ckpt='', init=True, use_gpu=0):
-    from models.exif import exif_net, exif_solver
+    from selfconsistency.models.exif import exif_net, exif_solver
     tf.reset_default_graph()
     net_args = {'num_classes':80+3,
                 'is_training':False,
