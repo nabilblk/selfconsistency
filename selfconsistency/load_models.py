@@ -1,5 +1,4 @@
 import sys, os
-import init_paths
 import tensorflow as tf
 
 def initialize_exif(ckpt='', init=True, use_gpu=0):
