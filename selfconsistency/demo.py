@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
 import time
 def mean_shift(points_, heat_map, iters=5):
-    print('Shape mean shift in : {}'.format(points_.shape))
+    #print('Shape mean shift in : {}'.format(points_.shape))
     points = np.copy(points_)
     kdt = scipy.spatial.cKDTree(points)
     eps_5 = np.percentile(scipy.spatial.distance.cdist(points, points, metric='euclidean'), 10)
@@ -177,7 +177,7 @@ def dbscan_consensus(results, eps_range=(0.1, 0.5), eps_sample=10, dbscan_sample
 class Demo():
     def __init__(self, ckpt_path='/data/scratch/minyoungg/ckpt/exif_medifor/exif_medifor.ckpt', use_gpu=0,
                  quality=3.0, patch_size=128, num_per_dim=30,nb_threads= 10,num_threads=1,n_anchors = 10):
-        print('LOADED')
+        #print('LOADED')
         self.quality = quality # sample ratio
         self.solver, nc, params = load_models.initialize_exif(ckpt=ckpt_path, init=False, use_gpu=use_gpu)
         params["im_size"] = patch_size
@@ -193,14 +193,14 @@ class Demo():
             blue_high=False, use_ncuts=False,dense = True):
         # run for every new image
         self.bu.reset_image(im)
-        print('START')
+        #print('START')
         start = time.time()
         res = self.bu.precomputed_analysis_vote_cls(num_fts=4096,dense = dense)
-        print('precomputed_analysis_vote_cls took {} s'.format(time.time()-start))
+        print('self-consistency precompute analysis %.1f s' % time.time()-start)
         if not use_ncuts:
             start = time.time()
             ms = mean_shift(res.reshape((-1, res.shape[0] * res.shape[1])), res)
-            print('Mean shift took {} s'.format(time.time()-start))
+            print('self-consistency mean shift %.1f s' % time.time()-start)
         
             if np.mean(ms > .5) > .5:
                 # majority of the image is above .5
@@ -230,7 +230,7 @@ class Demo():
         all_results = []
         for hSt in np.linspace(0, h - patch_size, num_per_dim).astype(int):
             for wSt in np.linspace(0, w - patch_size, num_per_dim).astype(int):
-                print('START')
+                #print('START')
                 res = run_vote_no_threads(im, self.solver, None, n_anchors=1, num_per_dim=None,
                                           patch_size=128, batch_size=64, sample_ratio=self.quality, 
                                           override_anchor=(hSt, wSt))['out']['responses'][0]

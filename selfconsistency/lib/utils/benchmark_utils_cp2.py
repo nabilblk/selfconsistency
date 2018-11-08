@@ -128,7 +128,7 @@ class EfficientBenchmark():
         self.set_image(im)
         self.cr.set_data_fn(fn)
         self.cr.start_p_threads(self.solver.sess)
-        print('RESET_TOOK {} s'.format(time.time()-t0))
+        #print('RESET_TOOK {} s'.format(time.time()-t0))
     def get_patch(self, hind, wind):
         return self.image[hind:hind+self.patch_size, wind:wind+self.patch_size]
         

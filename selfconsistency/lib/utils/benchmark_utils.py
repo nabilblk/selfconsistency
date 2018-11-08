@@ -130,7 +130,7 @@ class EfficientBenchmark():
         self.set_image(im)
         self.cr.set_data_fn(fn)
         self.cr.start_p_threads(self.solver.sess)
-        print('RESET_TOOK {} s'.format(time.time() - t0))
+        #print('RESET_TOOK {} s'.format(time.time() - t0))
 
     def get_patch(self, hind, wind):
         return self.image[hind:hind + self.patch_size, wind:wind + self.patch_size]
@@ -195,7 +195,7 @@ class EfficientBenchmark():
         return self.data_fn(inds[0], inds[1])
 
     def argless_extract_inds(self,dense = True):
-        print('NB patches : {}'.format(self.indices.shape[0]))
+        print('Self-consistency nb patches {}'.format(self.indices.shape[0]))
         if dense:
             iterator = np.mgrid[0:self.max_h_ind, 0:self.max_w_ind,
                                 0:self.max_h_ind, 0:self.max_w_ind].reshape((4, -1)).T  # (n 4)
@@ -311,7 +311,7 @@ class EfficientBenchmark():
                           inds[i][1] : (inds[i][1] + spread),
                           inds[i][2] : (inds[i][2] + spread),
                           inds[i][3] : (inds[i][3] + spread)] += 1
-            print('precomputed analysis time : {}'.format(time.time() - t))
+            #print('precomputed analysis time : {}'.format(time.time() - t))
         if self.auto_close_sess:
             self.solver.sess.close()
         out = (responses / vote_counts)
