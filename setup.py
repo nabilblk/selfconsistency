@@ -8,7 +8,7 @@ with open('README.md', 'r') as f:
     readme = f.read()
 setup(
     name='selfconsistency',
-    version='1.3',
+    version='1.4',
     packages=find_packages(exclude=['tests*']),
     license='Apache 2.0',
     description='Image Splice Detection via Learned Self-Consistency',
