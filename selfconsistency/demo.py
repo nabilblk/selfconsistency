@@ -196,11 +196,11 @@ class Demo():
         #print('START')
         start = time.time()
         res = self.bu.precomputed_analysis_vote_cls(num_fts=4096,dense = dense)
-        print('self-consistency precompute analysis %.1f s' % time.time()-start)
+        print('self-consistency precompute analysis %.1f s' % (time.time()-start))
         if not use_ncuts:
             start = time.time()
             ms = mean_shift(res.reshape((-1, res.shape[0] * res.shape[1])), res)
-            print('self-consistency mean shift %.1f s' % time.time()-start)
+            print('self-consistency mean shift %.1f s' % (time.time()-start))
         
             if np.mean(ms > .5) > .5:
                 # majority of the image is above .5
