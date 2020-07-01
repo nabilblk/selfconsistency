@@ -13,7 +13,7 @@ def make_dir(dir):
     """ Makes subdirectories for the filepath """
     if os.path.exists(dir):
         return dir
-    os.makedirs(dir)
+    os.makedirs(dir, exist_ok=True)
     return dir
 
 def read_json(path):
